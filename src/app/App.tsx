@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Home, Heart, Bell, Settings, Eye, EyeOff, Wifi, Check, ChevronRight, X } from 'lucide-react';
+import { fetchDashboard, fetchTimeline, fetchPatterns, fetchMedications, addMedication, fetchSettings } from './api';
 
 export default function App() {
   const [authStep, setAuthStep] = useState<'login' | 'hardware' | 'dashboard'>('login');
@@ -402,13 +403,31 @@ function NavItem({ icon, label, active, onClick }: any) {
 }
 
 function DashboardScreen({ setActiveTab }: any) {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboard('CASA10')
+      .then(res => {
+        setData(res);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
+  if (loading) return <div className="px-4 pt-4 pb-6">Cargando resumen...</div>;
+  if (!data) return <div className="px-4 pt-4 pb-6 text-red-500">Error cargando resumen</div>;
+
   return (
     <div className="px-4 pt-4 pb-6">
       <h1 className="text-[28px] font-semibold text-[#111] mb-1">
         Cuidado de Manuel
       </h1>
       <p className="text-[16px] text-[#8e8e93] mb-6">
-        Hoy, 10 de abril
+        Hoy
       </p>
 
       {/* Hero Status Card */}
@@ -419,27 +438,27 @@ function DashboardScreen({ setActiveTab }: any) {
         <p className="text-[16px] text-[#6e6e73] text-center">
           La rutina de Manuel se mantiene dentro de lo esperado.
         </p>
-        <p className="text-[12px] text-[#8e8e93]">Última actualización hace 15 min</p>
+        <p className="text-[12px] text-[#8e8e93]">Última actualización reciente</p>
       </div>
 
       <h3 className="text-[16px] font-medium text-black mb-4">Resumen de hoy</h3>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <button onClick={() => setActiveTab('medicacion')} className="text-left">
+        <button onClick={() => setActiveTab('medicacion')} className="text-left w-full">
           <StatCard
-            icon={<div className="w-3 h-3 rounded-full bg-[#d8d8de]"></div>}
+            icon={<div className="w-3 h-3 rounded-full bg-[#c97b6b]"></div>}
             title="Medicación"
-            value="Dosis matutina completada"
-            time="8:30 AM"
+            value="Pendiente revisar"
+            time=""
           />
         </button>
-        <button onClick={() => setActiveTab('actividad')} className="text-left">
+        <button onClick={() => setActiveTab('actividad')} className="text-left w-full">
           <StatCard
-            icon={<div className="w-3 h-3 rounded-full bg-[#d8d8de]"></div>}
+            icon={<Heart size={16} className="text-[#8faf74]" />}
             title="Actividad"
-            value="Dosis matutina completada"
-            time="8:30 AM"
+            value={`${data.pasosHoy || 0} pasos`}
+            time={`${data.tiempoSala || '0h'}`}
           />
         </button>
       </div>
@@ -481,39 +500,47 @@ function StatCard({ icon, title, value, time }: any) {
 }
 
 function TimelineScreen() {
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchTimeline('CASA10')
+      .then(res => {
+        setEvents(res);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="px-4 pt-4 pb-6">
       <h1 className="text-[28px] font-semibold text-[#111] mb-1">
         El plan de hoy
       </h1>
       <p className="text-[16px] text-[#8e8e93] mb-6">
-        Lunes, 17 de abril
+        Hoy
       </p>
 
       {/* Timeline - Hoy */}
       <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-4 mb-4">
-        <TimelineItem
-          time="08:00 AM"
-          title="Tótem tocado"
-          subtitle="Saludo manual enviado"
-        />
-        <TimelineItem
-          time="11:00"
-          title="Omega 3"
-        />
-        <TimelineItem
-          time="12:00"
-          title="Medición Ritmo Cardíaco"
-        />
-        <TimelineItem
-          time="11:00"
-          title="Multivitamínico"
-        />
-        <TimelineItem
-          time="15:00"
-          title="Aceite de pescado"
-          isLast
-        />
+        {loading ? (
+          <p className="text-center py-4 text-[#8e8e93]">Cargando rutina...</p>
+        ) : events.length === 0 ? (
+          <p className="text-center py-4 text-[#8e8e93]">No hay eventos registrados hoy</p>
+        ) : (
+          events.map((event, index) => (
+            <TimelineItem
+              key={event.id || index}
+              time={event.hora}
+              title={event.titulo}
+              subtitle={event.subtitulo}
+              isLast={index === events.length - 1}
+            />
+          ))
+        )}
       </div>
 
       {/* Activity Cards */}
@@ -554,6 +581,8 @@ function TimelineItem({ time, title, subtitle, isLast }: any) {
 }
 
 function MedicacionScreen() {
+  const [medications, setMedications] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [formData, setFormData] = useState({
     nombre: '',
@@ -561,9 +590,37 @@ function MedicacionScreen() {
     horario: ''
   });
 
+  const loadMedications = () => {
+    setLoading(true);
+    fetchMedications('CASA10')
+      .then(res => {
+        setMedications(res);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadMedications();
+  }, []);
+
   const handleSave = () => {
-    setFormData({ nombre: '', dosis: '', horario: '' });
-    setShowModal(false);
+    addMedication({
+      elder_id: 'CASA10',
+      name: formData.nombre,
+      dose: formData.dosis,
+      schedule: formData.horario
+    }).then(() => {
+      setFormData({ nombre: '', dosis: '', horario: '' });
+      setShowModal(false);
+      loadMedications();
+    }).catch(err => {
+      console.error(err);
+      alert('Error al guardar medicamento');
+    });
   };
 
   return (
@@ -592,30 +649,21 @@ function MedicacionScreen() {
 
       {/* Medication List */}
       <div className="space-y-4">
-        <MedicationCard
-          name="Omega 3"
-          dose="1 capsula/ 300mg"
-          instructions="Con comida"
-          time="11:00"
-        />
-        <MedicationCard
-          name="Medir presión arterial"
-          dose="1 capsula/ 300mg"
-          instructions="Depues de comer"
-          time="12:00-22:00"
-        />
-        <MedicationCard
-          name="Multivitamínico"
-          dose="2 capsula/400mg"
-          instructions="Con comida"
-          time="11:00-22:00"
-        />
-        <MedicationCard
-          name="Aceite de pescado"
-          dose="3 capsulas/100mg"
-          instructions="Con comida"
-          time="15:00"
-        />
+        {loading ? (
+          <p className="text-center text-[#8e8e93]">Cargando medicamentos...</p>
+        ) : medications.length === 0 ? (
+          <p className="text-center text-[#8e8e93]">No hay medicamentos registrados</p>
+        ) : (
+          medications.map((med, index) => (
+            <MedicationCard
+              key={med._id || index}
+              name={med.name}
+              dose={med.dose}
+              instructions=""
+              time={med.schedule}
+            />
+          ))
+        )}
       </div>
 
       {/* Add New Button */}
@@ -727,6 +775,21 @@ function MedicationCard({ name, dose, instructions, time }: any) {
 }
 
 function ActividadScreen() {
+  const [patterns, setPatterns] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchPatterns('CASA10')
+      .then(res => {
+        setPatterns(res);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setLoading(false);
+      });
+  }, []);
+
   return (
     <div className="px-4 pt-4 pb-6">
       {/* Date Selector */}
@@ -753,7 +816,7 @@ function ActividadScreen() {
 
       {/* Resumen Card - Filled Area Chart */}
       <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-5 mb-6">
-        <h3 className="text-[20px] font-semibold text-[#c97b6b] mb-4">Resumen</h3>
+        <h3 className="text-[20px] font-semibold text-[#c97b6b] mb-4">Resumen Semanal</h3>
         <div className="h-[80px] w-full relative">
           <svg className="w-full h-full" viewBox="0 0 353 80" preserveAspectRatio="none">
             <defs>
@@ -792,10 +855,18 @@ function ActividadScreen() {
 
       {/* Activity Cards Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <ActivityMetricCard title="Pasos" value="1.000" type="bars" />
-        <ActivityMetricCard title="Movimiento" value="1.000" type="wave" />
-        <ActivityMetricCard title="Frecuencia Cardiaca" value="95" unit="bpm" type="pulse" />
-        <ActivityMetricCard title="Calorias" value="1.500" type="bars" />
+        {loading ? (
+          <div className="col-span-2 text-center text-[#8e8e93]">Cargando patrones...</div>
+        ) : !patterns ? (
+          <div className="col-span-2 text-center text-red-500">Error cargando patrones</div>
+        ) : (
+          <>
+            <ActivityMetricCard title="Pasos" value={patterns.pasos?.[0]?.valor || 0} type="bars" />
+            <ActivityMetricCard title="Movimiento" value={patterns.movimiento?.[0]?.valor || 0} type="wave" />
+            <ActivityMetricCard title="Frecuencia Cardiaca" value={patterns.ritmoCardiaco?.[0]?.valor || 0} unit="bpm" type="pulse" />
+            <ActivityMetricCard title="Tiempo Sala" value={patterns.tiempoSala?.[0]?.valor || 0} unit="min" type="bars" />
+          </>
+        )}
       </div>
     </div>
   );
@@ -930,8 +1001,17 @@ function AlertSection({ title, alerts }: any) {
 
 function AjustesScreen() {
   const [openPanel, setOpenPanel] = useState<string | null>(null);
+  const [userSettings, setUserSettings] = useState<any>(null);
 
-  const settings = [
+  useEffect(() => {
+    fetchSettings('CASA10')
+      .then(res => {
+        setUserSettings(res);
+      })
+      .catch(err => console.error('Error fetching settings', err));
+  }, []);
+
+  const settingsMenu = [
     'Perfil y Cuenta',
     'Alertas',
     'Información',
@@ -948,7 +1028,7 @@ function AjustesScreen() {
       <h1 className="text-[28px] font-semibold text-[#111] mb-8">Ajustes</h1>
 
       <div className="bg-white">
-        {settings.map((setting, i) => (
+        {settingsMenu.map((setting, i) => (
           <button
             key={i}
             onClick={() => setOpenPanel(setting)}
@@ -987,7 +1067,9 @@ function AjustesScreen() {
                 <div className="space-y-3">
                   <div className="bg-[#fdfcfb] rounded-lg p-4 border border-[#d8d8de]">
                     <p className="text-[14px] text-[#8e8e93]">
-                      Las opciones de configuración para esta sección aparecerán aquí.
+                      {(openPanel === 'Notificaciones' && userSettings?.notificaciones) ? 'Las notificaciones están activadas.' : 
+                       (openPanel === 'Alertas' && userSettings?.alertas) ? 'Las alertas están activadas.' : 
+                       'Las opciones de configuración para esta sección aparecerán aquí.'}
                     </p>
                   </div>
                 </div>
