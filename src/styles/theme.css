@@ -1,4 +1,6 @@
 @custom-variant dark (&:is(.dark *));
+@custom-variant desktop (@media (min-width: 481px));
+
 
 :root {
   --font-size: 16px;

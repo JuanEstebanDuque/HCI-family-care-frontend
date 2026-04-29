@@ -1,14 +1,23 @@
 import { useState, useEffect } from 'react';
-import { Home, Heart, Bell, Settings, Eye, EyeOff, Wifi, Check, ChevronRight, X } from 'lucide-react';
-import { fetchDashboard, fetchTimeline, fetchPatterns, fetchMedications, addMedication, fetchSettings } from './api';
+import { Home, Heart, Bell, Settings, Eye, EyeOff, Wifi, Check, ChevronRight, X, Plus } from 'lucide-react';
+import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { fetchDashboard, fetchTimeline, fetchPatterns, fetchMedications, addMedication, fetchSettings, registerUser, loginUser, fetchUserByEmail, fetchReminders, addReminder } from './api';
 
 export default function App() {
   const [authStep, setAuthStep] = useState<'login' | 'hardware' | 'dashboard'>('login');
   const [activeTab, setActiveTab] = useState('resumen');
   const [isLogin, setIsLogin] = useState(true);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   if (authStep === 'login') {
-    return <LoginScreen onComplete={() => setAuthStep('hardware')} isLogin={isLogin} setIsLogin={setIsLogin} />;
+    return <LoginScreen
+      onComplete={(user: any, isRegister: boolean) => {
+        setCurrentUser(user);
+        setAuthStep(isRegister ? 'hardware' : 'dashboard');
+      }}
+      isLogin={isLogin}
+      setIsLogin={setIsLogin}
+    />;
   }
 
   if (authStep === 'hardware') {
@@ -16,53 +25,42 @@ export default function App() {
   }
 
   return (
-    <div className="bg-white h-screen w-full max-w-[390px] mx-auto relative flex flex-col">
-      {/* Status Bar */}
-      <div className="h-[47px] flex items-center justify-between px-4 pt-3">
-        <span className="font-semibold text-[20px]">9:41</span>
-        <div className="flex gap-1.5">
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[25px] h-[11px] bg-black rounded-sm"></div>
+    <div className="bg-white min-h-screen w-full flex flex-col desktop:flex-row desktop:items-start">
+      {/* Desktop Sidebar Nav */}
+      <div className="hidden desktop:flex desktop:flex-col desktop:w-[240px] desktop:min-h-screen desktop:border-r desktop:border-[#d8d8de] desktop:bg-white desktop:fixed desktop:left-0 desktop:top-0 desktop:bottom-0">
+        <div className="p-6 border-b border-[#d8d8de]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#c97b6b] to-[#b86a5a] flex items-center justify-center">
+              <Heart size={20} className="text-white" />
+            </div>
+            <span className="font-bold text-[18px] text-[#111]">El Faro</span>
+          </div>
         </div>
+        <nav className="flex flex-col gap-1 p-4 flex-1">
+          {[{tab:'resumen',icon:<Home size={20}/>,label:'Resumen'},{tab:'rutina',icon:<Heart size={20}/>,label:'Rutina'},{tab:'alertas',icon:<Bell size={20}/>,label:'Alertas'},{tab:'ajustes',icon:<Settings size={20}/>,label:'Ajustes'}].map(({tab,icon,label})=>(
+            <button key={tab} onClick={()=>setActiveTab(tab)} className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all text-left ${activeTab===tab?'bg-[#c97b6b] text-white':'text-[#6e6e73] hover:bg-[#fdfcfb]'}`}>
+              {icon}<span className="text-[15px] font-medium">{label}</span>
+            </button>
+          ))}
+        </nav>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto pb-[84px]">
-        {activeTab === 'resumen' && <DashboardScreen setActiveTab={setActiveTab} />}
-        {activeTab === 'rutina' && <TimelineScreen />}
+      <div className="flex-1 desktop:ml-[240px] overflow-y-auto pb-[84px] desktop:pb-6 desktop:max-w-[900px]">
+        {activeTab === 'resumen' && <DashboardScreen setActiveTab={setActiveTab} user={currentUser} />}
+        {activeTab === 'rutina' && <TimelineScreen user={currentUser} />}
         {activeTab === 'medicacion' && <MedicacionScreen />}
-        {activeTab === 'actividad' && <ActividadScreen />}
+        {activeTab === 'actividad' && <ActividadScreen user={currentUser} />}
         {activeTab === 'alertas' && <AlertasScreen />}
-        {activeTab === 'ajustes' && <AjustesScreen />}
+        {activeTab === 'ajustes' && <AjustesScreen user={currentUser} />}
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="absolute bottom-0 left-0 right-0 h-[84px] bg-white border-t border-[#d8d8de] flex items-center justify-around px-5">
-        <NavItem
-          icon={<Home size={20} />}
-          label="Resumen"
-          active={activeTab === 'resumen'}
-          onClick={() => setActiveTab('resumen')}
-        />
-        <NavItem
-          icon={<Heart size={20} />}
-          label="Rutina"
-          active={activeTab === 'rutina'}
-          onClick={() => setActiveTab('rutina')}
-        />
-        <NavItem
-          icon={<Bell size={20} />}
-          label="Alertas"
-          active={activeTab === 'alertas'}
-          onClick={() => setActiveTab('alertas')}
-        />
-        <NavItem
-          icon={<Settings size={20} />}
-          label="Ajustes"
-          active={activeTab === 'ajustes'}
-          onClick={() => setActiveTab('ajustes')}
-        />
+      {/* Mobile Bottom Navigation */}
+      <div className="desktop:hidden fixed bottom-0 left-0 right-0 h-[84px] bg-white border-t border-[#d8d8de] flex items-center justify-around px-5 z-40">
+        <NavItem icon={<Home size={20}/>} label="Resumen" active={activeTab==='resumen'} onClick={()=>setActiveTab('resumen')}/>
+        <NavItem icon={<Heart size={20}/>} label="Rutina" active={activeTab==='rutina'} onClick={()=>setActiveTab('rutina')}/>
+        <NavItem icon={<Bell size={20}/>} label="Alertas" active={activeTab==='alertas'} onClick={()=>setActiveTab('alertas')}/>
+        <NavItem icon={<Settings size={20}/>} label="Ajustes" active={activeTab==='ajustes'} onClick={()=>setActiveTab('ajustes')}/>
       </div>
     </div>
   );
@@ -73,132 +71,119 @@ function LoginScreen({ onComplete, isLogin, setIsLogin }: any) {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    onComplete();
+    setError('');
+    setLoading(true);
+    try {
+      let user;
+      if (isLogin) {
+        user = await loginUser({ email, password });
+        onComplete(user, false);
+      } else {
+        user = await registerUser({ nombre: name, email, password });
+        onComplete(user, true);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Ocurrió un error');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="bg-[#fdfcfb] min-h-screen w-full max-w-[390px] mx-auto flex flex-col">
-      {/* Status Bar */}
-      <div className="h-[47px] flex items-center justify-between px-4 pt-3">
-        <span className="font-semibold text-[20px]">9:41</span>
-        <div className="flex gap-1.5">
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[25px] h-[11px] bg-black rounded-sm"></div>
+    <div className="bg-[#fdfcfb] min-h-screen w-full flex flex-col desktop:flex-row">
+      {/* Desktop: Left Branding Panel */}
+      <div className="hidden desktop:flex desktop:w-1/2 desktop:min-h-screen bg-gradient-to-br from-[#c97b6b] to-[#9d5a4d] flex-col items-center justify-center px-12 gap-6">
+        <div className="w-24 h-24 rounded-full bg-white/20 flex items-center justify-center shadow-2xl mb-2">
+          <Heart size={52} className="text-white" strokeWidth={2} />
+        </div>
+        <h2 className="text-[36px] font-bold text-white text-center leading-tight">El Faro</h2>
+        <p className="text-[18px] text-white/80 text-center max-w-[320px] leading-relaxed">
+          Monitorea el bienestar de tu ser querido con tranquilidad, desde cualquier lugar.
+        </p>
+        <div className="flex gap-3 mt-4">
+          {['Tiempo real','Alertas','Medicación'].map(tag => (
+            <span key={tag} className="px-3 py-1.5 bg-white/20 rounded-full text-white text-[13px] font-medium">{tag}</span>
+          ))}
         </div>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12">
-        {/* Logo/Icon Area */}
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#c97b6b] to-[#b86a5a] flex items-center justify-center mb-8 shadow-lg">
-          <Heart size={40} className="text-white" strokeWidth={2} />
-        </div>
-
-        {/* Title */}
-        <h1 className="text-[32px] font-bold text-[#111] mb-2 text-center">
-          {isLogin ? 'Bienvenido' : 'Crear cuenta'}
-        </h1>
-        <p className="text-[16px] text-[#6e6e73] mb-8 text-center max-w-[280px]">
-          {isLogin
-            ? 'Cuida de tu ser querido con tranquilidad'
-            : 'Comienza a cuidar de quien más importa'
-          }
-        </p>
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="w-full max-w-[340px] space-y-4">
-          {!isLogin && (
-            <div>
-              <label className="block text-[14px] font-medium text-[#111] mb-2">
-                Nombre completo
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full h-[52px] px-4 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
-                placeholder="Tu nombre"
-                required
-              />
-            </div>
-          )}
-
-          <div>
-            <label className="block text-[14px] font-medium text-[#111] mb-2">
-              Correo electrónico
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full h-[52px] px-4 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
-              placeholder="tu@email.com"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-[14px] font-medium text-[#111] mb-2">
-              Contraseña
-            </label>
-            <div className="relative">
-              <input
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full h-[52px] px-4 pr-12 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
-                placeholder="••••••••"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] hover:text-[#111] transition-colors"
-              >
-                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
-              </button>
+      {/* Right: Form Panel */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-[390px]">
+          {/* Logo visible solo en mobile */}
+          <div className="desktop:hidden flex flex-col items-center mb-8">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#c97b6b] to-[#b86a5a] flex items-center justify-center shadow-lg">
+              <Heart size={40} className="text-white" strokeWidth={2} />
             </div>
           </div>
 
-          {isLogin && (
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="text-[14px] text-[#c97b6b] font-medium hover:text-[#b86a5a] transition-colors"
-              >
-                ¿Olvidaste tu contraseña?
-              </button>
-            </div>
-          )}
-
-          <button
-            type="submit"
-            className="w-full h-[56px] bg-[#c97b6b] hover:bg-[#b86a5a] text-white text-[16px] font-semibold rounded-2xl transition-all shadow-lg shadow-[#c97b6b]/20 hover:shadow-xl hover:shadow-[#c97b6b]/30 mt-6"
-          >
-            {isLogin ? 'Iniciar sesión' : 'Crear cuenta'}
-          </button>
-        </form>
-
-        {/* Toggle Login/Register */}
-        <div className="mt-6 flex items-center gap-2">
-          <p className="text-[14px] text-[#6e6e73]">
-            {isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}
+          <h1 className="text-[32px] font-bold text-[#111] mb-2 text-center desktop:text-left">
+            {isLogin ? 'Bienvenido' : 'Crear cuenta'}
+          </h1>
+          <p className="text-[16px] text-[#6e6e73] mb-8 text-center desktop:text-left">
+            {isLogin ? 'Cuida de tu ser querido con tranquilidad' : 'Comienza a cuidar de quien más importa'}
           </p>
-          <button
-            onClick={() => setIsLogin(!isLogin)}
-            className="text-[14px] text-[#c97b6b] font-semibold hover:text-[#b86a5a] transition-colors"
-          >
-            {isLogin ? 'Registrarse' : 'Iniciar sesión'}
-          </button>
-        </div>
 
-        {/* Privacy Note */}
-        <p className="text-[12px] text-[#8e8e93] text-center mt-8 max-w-[300px] leading-relaxed">
-          Al continuar, aceptas nuestros términos de servicio y política de privacidad médica.
-        </p>
+          {error && (
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-600">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {!isLogin && (
+              <div>
+                <label className="block text-[14px] font-medium text-[#111] mb-2">Nombre completo</label>
+                <input type="text" value={name} onChange={(e) => setName(e.target.value)}
+                  className="w-full h-[52px] px-4 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
+                  placeholder="Tu nombre" required />
+              </div>
+            )}
+            <div>
+              <label className="block text-[14px] font-medium text-[#111] mb-2">Correo electrónico</label>
+              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                className="w-full h-[52px] px-4 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
+                placeholder="tu@email.com" required />
+            </div>
+            <div>
+              <label className="block text-[14px] font-medium text-[#111] mb-2">Contraseña</label>
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} value={password} onChange={(e) => setPassword(e.target.value)}
+                  className="w-full h-[52px] px-4 pr-12 bg-white border border-[#d8d8de] rounded-2xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
+                  placeholder="••••••••" required />
+                <button type="button" onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#8e8e93] hover:text-[#111] transition-colors">
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
+            </div>
+            {isLogin && (
+              <div className="flex justify-end">
+                <button type="button" className="text-[14px] text-[#c97b6b] font-medium hover:text-[#b86a5a] transition-colors">¿Olvidaste tu contraseña?</button>
+              </div>
+            )}
+            <button type="submit" disabled={loading}
+              className="w-full h-[56px] bg-[#c97b6b] hover:bg-[#b86a5a] disabled:opacity-60 text-white text-[16px] font-semibold rounded-2xl transition-all shadow-lg shadow-[#c97b6b]/20 mt-6">
+              {loading ? 'Cargando...' : (isLogin ? 'Iniciar sesión' : 'Crear cuenta')}
+            </button>
+          </form>
+
+          <div className="mt-6 flex items-center gap-2 justify-center desktop:justify-start">
+            <p className="text-[14px] text-[#6e6e73]">{isLogin ? '¿No tienes cuenta?' : '¿Ya tienes cuenta?'}</p>
+            <button onClick={() => { setIsLogin(!isLogin); setError(''); }}
+              className="text-[14px] text-[#c97b6b] font-semibold hover:text-[#b86a5a] transition-colors">
+              {isLogin ? 'Registrarse' : 'Iniciar sesión'}
+            </button>
+          </div>
+          <p className="text-[12px] text-[#8e8e93] text-center desktop:text-left mt-8 leading-relaxed">
+            Al continuar, aceptas nuestros términos de servicio y política de privacidad médica.
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -209,73 +194,63 @@ function HardwareSetupScreen({ onComplete }: any) {
 
   if (step === 'intro') {
     return (
-      <div className="bg-[#fdfcfb] min-h-screen w-full max-w-[390px] mx-auto flex flex-col">
-        {/* Status Bar */}
-        <div className="h-[47px] flex items-center justify-between px-4 pt-3">
-          <span className="font-semibold text-[20px]">9:41</span>
-          <div className="flex gap-1.5">
-            <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-            <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-            <div className="w-[25px] h-[11px] bg-black rounded-sm"></div>
+      <div className="bg-[#fdfcfb] min-h-screen w-full flex flex-col desktop:flex-row">
+        {/* Desktop: Left Branding Panel */}
+        <div className="hidden desktop:flex desktop:w-1/2 desktop:min-h-screen bg-gradient-to-br from-[#8faf74] to-[#5c7d48] flex-col items-center justify-center px-12 gap-6">
+          <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center shadow-2xl mb-2">
+            <Wifi size={60} className="text-white" strokeWidth={2} />
           </div>
+          <h2 className="text-[36px] font-bold text-white text-center">Configuración del Tótem</h2>
+          <p className="text-[18px] text-white/80 text-center max-w-[320px] leading-relaxed">
+            En pocos pasos vincularemos el dispositivo con tu cuenta.
+          </p>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-6 pb-12">
-          {/* Icon */}
-          <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#8faf74] to-[#7a9a63] flex items-center justify-center mb-8 shadow-xl">
-            <Wifi size={48} className="text-white" strokeWidth={2} />
+        {/* Right: Content */}
+        <div className="flex-1 flex items-center justify-center px-6 py-12">
+          <div className="w-full max-w-[390px] flex flex-col items-center">
+            {/* Icon visible solo en mobile */}
+            <div className="desktop:hidden w-24 h-24 rounded-full bg-gradient-to-br from-[#8faf74] to-[#7a9a63] flex items-center justify-center mb-8 shadow-xl">
+              <Wifi size={48} className="text-white" strokeWidth={2} />
+            </div>
+
+            <h1 className="text-[28px] font-bold text-[#111] mb-4 text-center">Configuración de Dispositivo</h1>
+            <p className="text-[16px] text-[#6e6e73] text-center max-w-[320px] mb-12 leading-relaxed">
+              Vamos a vincular el Tótem con tu cuenta para que puedas comenzar a monitorear el bienestar de tu ser querido.
+            </p>
+
+            <div className="w-full space-y-4 mb-12">
+              <StepItem number={1} title="Verificar código de enlace" description="El Tótem tiene un código único preconfigurado" />
+              <StepItem number={2} title="Enchufar el Tótem" description="Tu ser querido solo necesita conectarlo a la corriente" />
+              <StepItem number={3} title="Listo para usar" description="El sistema comenzará a funcionar automáticamente" />
+            </div>
+
+            <button onClick={() => setStep('token')}
+              className="w-full h-[56px] bg-[#c97b6b] hover:bg-[#b86a5a] text-white text-[16px] font-semibold rounded-2xl transition-all shadow-lg shadow-[#c97b6b]/20">
+              Continuar
+            </button>
           </div>
-
-          <h1 className="text-[28px] font-bold text-[#111] mb-4 text-center">
-            Configuración de Dispositivo
-          </h1>
-          <p className="text-[16px] text-[#6e6e73] text-center max-w-[320px] mb-12 leading-relaxed">
-            Vamos a vincular el Tótem con tu cuenta para que puedas comenzar a monitorear el bienestar de tu ser querido.
-          </p>
-
-          {/* Steps */}
-          <div className="w-full max-w-[340px] space-y-4 mb-12">
-            <StepItem
-              number={1}
-              title="Verificar código de enlace"
-              description="El Tótem tiene un código único preconfigurado"
-            />
-            <StepItem
-              number={2}
-              title="Enchufar el Tótem"
-              description="Tu ser querido solo necesita conectarlo a la corriente"
-            />
-            <StepItem
-              number={3}
-              title="Listo para usar"
-              description="El sistema comenzará a funcionar automáticamente"
-            />
-          </div>
-
-          <button
-            onClick={() => setStep('token')}
-            className="w-full max-w-[340px] h-[56px] bg-[#c97b6b] hover:bg-[#b86a5a] text-white text-[16px] font-semibold rounded-2xl transition-all shadow-lg shadow-[#c97b6b]/20"
-          >
-            Continuar
-          </button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-[#fdfcfb] min-h-screen w-full max-w-[390px] mx-auto flex flex-col">
-      {/* Status Bar */}
-      <div className="h-[47px] flex items-center justify-between px-4 pt-3">
-        <span className="font-semibold text-[20px]">9:41</span>
-        <div className="flex gap-1.5">
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[15px] h-[11px] bg-black rounded-sm"></div>
-          <div className="w-[25px] h-[11px] bg-black rounded-sm"></div>
+    <div className="bg-[#fdfcfb] min-h-screen w-full flex flex-col desktop:flex-row">
+      {/* Desktop: Left Branding Panel */}
+      <div className="hidden desktop:flex desktop:w-1/2 desktop:min-h-screen bg-gradient-to-br from-[#8faf74] to-[#5c7d48] flex-col items-center justify-center px-12 gap-6">
+        <div className="w-28 h-28 rounded-full bg-white/20 flex items-center justify-center shadow-2xl mb-2">
+          <Check size={60} className="text-white" strokeWidth={3} />
         </div>
+        <h2 className="text-[36px] font-bold text-white text-center">Enlace de Dispositivo</h2>
+        <p className="text-[18px] text-white/80 text-center max-w-[320px] leading-relaxed">
+          Tu Tótem está listo para comenzar a cuidar de tu ser querido.
+        </p>
       </div>
 
-      <div className="flex-1 flex flex-col px-6 pt-8 pb-12">
+      {/* Right: Content */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-[420px]">
         {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-[#8faf74]/10 mb-4">
@@ -352,6 +327,7 @@ function HardwareSetupScreen({ onComplete }: any) {
         <button className="w-full mt-4 text-[14px] text-[#8e8e93] hover:text-[#c97b6b] transition-colors">
           ¿Necesitas ayuda con la instalación?
         </button>
+        </div>
       </div>
     </div>
   );
@@ -402,12 +378,17 @@ function NavItem({ icon, label, active, onClick }: any) {
   );
 }
 
-function DashboardScreen({ setActiveTab }: any) {
+function DashboardScreen({ setActiveTab, user }: any) {
+  const caregiver = user?.nombre || 'Cuidador';
+  const elderId = user?.pin_vinculacion || 'CASA10';
+  const elderName = user?.nombre_persona_a_cuidar || 'Manuel';
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const todayStr = new Date().toLocaleDateString('es-CO', { day: 'numeric', month: 'long' });
+
   useEffect(() => {
-    fetchDashboard('CASA10')
+    fetchDashboard(elderId)
       .then(res => {
         setData(res);
         setLoading(false);
@@ -424,65 +405,66 @@ function DashboardScreen({ setActiveTab }: any) {
   return (
     <div className="px-4 pt-4 pb-6">
       <h1 className="text-[28px] font-semibold text-[#111] mb-1">
-        Cuidado de Manuel
+        Cuidado de {elderName}
       </h1>
-      <p className="text-[16px] text-[#8e8e93] mb-6">
-        Hoy
+      <p className="text-[16px] text-[#8e8e93] mb-6 capitalize">
+        Hoy, {todayStr}
       </p>
 
       {/* Hero Status Card */}
       <div className="bg-white rounded-[20px] border border-[#d8d8de] shadow-lg p-5 flex flex-col items-center gap-3 mb-6">
-        <div className="w-3 h-3 rounded-full bg-[#8faf74]"></div>
+        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: data.estadoGeneral?.color || '#8faf74' }}></div>
         <p className="text-[12px] text-[#8e8e93]">Estado actual</p>
-        <h2 className="text-[36px] font-bold text-[#111]">Todo normal hoy</h2>
+        <h2 className="text-[32px] font-bold text-[#111] text-center leading-tight">{data.estadoGeneral?.titulo || 'Todo normal hoy'}</h2>
         <p className="text-[16px] text-[#6e6e73] text-center">
-          La rutina de Manuel se mantiene dentro de lo esperado.
+          {data.estadoGeneral?.descripcion || `La rutina de ${elderName} se mantiene dentro de lo esperado.`}
         </p>
-        <p className="text-[12px] text-[#8e8e93]">Última actualización reciente</p>
+        <p className="text-[12px] text-[#8e8e93]">Última actualización {data.estadoGeneral?.ultimaActualizacion || ''}</p>
       </div>
 
-      <h3 className="text-[16px] font-medium text-black mb-4">Resumen de hoy</h3>
+      <h3 className="text-[16px] font-semibold text-[#111] mb-4">Resumen de hoy</h3>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3 mb-6">
-        <button onClick={() => setActiveTab('medicacion')} className="text-left w-full">
+        <button onClick={() => setActiveTab('medicacion')} className="text-left w-full h-full">
           <StatCard
-            icon={<div className="w-3 h-3 rounded-full bg-[#c97b6b]"></div>}
+            icon={<div className="w-3 h-3 rounded-full bg-[#d8d8de]"></div>}
             title="Medicación"
-            value="Pendiente revisar"
-            time=""
+            value={data.resumenHoy?.medicacion?.estado || 'Sin datos'}
+            time={data.resumenHoy?.medicacion?.hora || ''}
           />
         </button>
-        <button onClick={() => setActiveTab('actividad')} className="text-left w-full">
+        <button onClick={() => setActiveTab('actividad')} className="text-left w-full h-full">
           <StatCard
-            icon={<Heart size={16} className="text-[#8faf74]" />}
+            icon={<div className="w-3 h-3 rounded-full bg-[#d8d8de]"></div>}
             title="Actividad"
-            value={`${data.pasosHoy || 0} pasos`}
-            time={`${data.tiempoSala || '0h'}`}
+            value={data.resumenHoy?.actividad?.estado || 'Sin datos'}
+            time={data.resumenHoy?.actividad?.hora || ''}
           />
         </button>
       </div>
 
       {/* System Card */}
-      <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-4 mb-6">
-        <div className="flex items-start gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#ebebf0] border border-[#d8d8de] flex items-center justify-center">
-            <Settings size={20} />
+      <button onClick={() => setActiveTab('ajustes')} className="w-full text-left bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-4 mb-6 transition-colors hover:bg-[#fdfcfb]">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-[#ebebf0] border border-[#d8d8de] flex items-center justify-center flex-shrink-0">
+            <div className="w-6 h-6 bg-[#d8d8de] rounded"></div>
           </div>
           <div className="flex-1">
-            <p className="text-[16px] font-medium text-[#111] mb-1">
-              Lectura del sistema
+            <p className="text-[16px] font-medium text-[#111] mb-0.5">
+              {data.lecturaSistema?.titulo || 'Lectura del sistema'}
             </p>
             <p className="text-[14px] text-[#8e8e93]">
-              No se detectan anomalias relevantes
+              {data.lecturaSistema?.mensaje || 'No se detectan anomalías relevantes'}
             </p>
           </div>
+          <ChevronRight size={20} className="text-[#8e8e93]" />
         </div>
-      </div>
+      </button>
 
       {/* Action Buttons */}
       <button className="w-full h-[56px] bg-[#1c1c1e] rounded-2xl text-white text-[16px] font-medium">
-        Contactar a Manuel
+        Contactar a {elderName}
       </button>
     </div>
   );
@@ -490,75 +472,142 @@ function DashboardScreen({ setActiveTab }: any) {
 
 function StatCard({ icon, title, value, time }: any) {
   return (
-    <div className="bg-white rounded-[20px] border border-[#d8d8de] p-4 flex flex-col items-center gap-2">
-      {icon}
-      <p className="text-[20px] font-semibold text-[#8e8e93]">{title}</p>
-      <p className="text-[16px] font-medium text-[#111] text-center">{value}</p>
-      <p className="text-[12px] text-[#6e6e73]">{time}</p>
+    <div className="bg-white rounded-[20px] border border-[#d8d8de] shadow-sm p-5 flex flex-col items-center justify-center text-center h-full">
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <p className="text-[16px] font-medium text-[#8e8e93]">{title}</p>
+      </div>
+      <p className="text-[15px] font-semibold text-[#111] mb-3 leading-snug">
+        {value}
+      </p>
+      <p className="text-[13px] text-[#8e8e93]">{time}</p>
     </div>
   );
 }
 
-function TimelineScreen() {
-  const [events, setEvents] = useState<any[]>([]);
+function TimelineScreen({ user }: any) {
+  const elderId = user?.pin_vinculacion || 'CASA10';
+  const elderName = user?.nombre_persona_a_cuidar || 'Manuel';
+  const [reminders, setReminders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState({ actividad: '', recordatorio_dia: 1, hora: '' });
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
-  useEffect(() => {
-    fetchTimeline('CASA10')
-      .then(res => {
-        setEvents(res);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
-  }, []);
+  const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+
+  const load = () => {
+    setLoading(true);
+    fetchReminders(elderId)
+      .then(res => { setReminders(res); setLoading(false); })
+      .catch(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, []);
+
+  const handleSave = async () => {
+    if (!form.actividad || !form.hora) return;
+    setSaving(true); setSaveError('');
+    try {
+      await addReminder({ elder_id: elderId, ...form });
+      setForm({ actividad: '', recordatorio_dia: 1, hora: '' });
+      setShowModal(false);
+      load();
+    } catch (e: any) {
+      setSaveError(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Sort by hora
+  const sorted = [...reminders].sort((a, b) => a.hora?.localeCompare(b.hora));
 
   return (
     <div className="px-4 pt-4 pb-6">
-      <h1 className="text-[28px] font-semibold text-[#111] mb-1">
-        El plan de hoy
-      </h1>
-      <p className="text-[16px] text-[#8e8e93] mb-6">
-        Hoy
-      </p>
+      <div className="flex items-center justify-between mb-1">
+        <h1 className="text-[28px] font-semibold text-[#111]">Plan de {elderName}</h1>
+        <button
+          onClick={() => setShowModal(true)}
+          className="w-10 h-10 rounded-full bg-[#c97b6b] flex items-center justify-center shadow-lg hover:bg-[#b86a5a] transition-colors">
+          <Plus size={20} className="text-white" />
+        </button>
+      </div>
+      <p className="text-[15px] text-[#8e8e93] mb-6 capitalize">{today}</p>
 
-      {/* Timeline - Hoy */}
-      <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-4 mb-4">
+      {/* Timeline */}
+      <div className="bg-white rounded-[16px] border border-[#d8d8de] shadow-lg p-4 mb-4">
         {loading ? (
-          <p className="text-center py-4 text-[#8e8e93]">Cargando rutina...</p>
-        ) : events.length === 0 ? (
-          <p className="text-center py-4 text-[#8e8e93]">No hay eventos registrados hoy</p>
+          <p className="text-center py-6 text-[#8e8e93]">Cargando rutina...</p>
+        ) : sorted.length === 0 ? (
+          <div className="flex flex-col items-center py-8 gap-3">
+            <div className="w-12 h-12 rounded-full bg-[#ebebf0] flex items-center justify-center">
+              <Bell size={24} className="text-[#8e8e93]" />
+            </div>
+            <p className="text-[15px] text-[#8e8e93] text-center">No hay recordatorios para hoy.<br/>Agrega uno con el botón +</p>
+          </div>
         ) : (
-          events.map((event, index) => (
-            <TimelineItem
-              key={event.id || index}
-              time={event.hora}
-              title={event.titulo}
-              subtitle={event.subtitulo}
-              isLast={index === events.length - 1}
-            />
-          ))
+          <div className="space-y-4">
+            {sorted.map((r, i) => (
+              <div key={r._id || i} className="flex items-start gap-4">
+                <div className="flex flex-col items-center">
+                  <div className="w-8 h-8 rounded-full bg-[#c97b6b]/10 flex items-center justify-center">
+                    <div className="w-2.5 h-2.5 rounded-full bg-[#c97b6b]"></div>
+                  </div>
+                  {i < sorted.length - 1 && <div className="w-px flex-1 bg-[#d8d8de] my-1 min-h-[16px]"></div>}
+                </div>
+                <div className="flex-1 pb-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-[16px] font-semibold text-[#111] capitalize">{r.actividad}</p>
+                    <span className="text-[13px] text-[#c97b6b] font-medium">{r.hora}</span>
+                  </div>
+                  <p className="text-[13px] text-[#8e8e93]">Recordatorio #{r.recordatorio_dia}</p>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
 
-      {/* Activity Cards */}
-      <ActivityCard
-        icon="💧"
-        title="Hidratacion"
-        progress={60}
-      />
-      <ActivityCard
-        icon="👣"
-        title="Pasos"
-        progress={40}
-      />
-      <ActivityCard
-        icon="🍽️"
-        title="Comida"
-        progress={80}
-      />
+      {/* Modal agregar recordatorio */}
+      {showModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
+          <div className="bg-white rounded-[24px] w-full max-w-[360px] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-[22px] font-bold text-[#111]">Nuevo Recordatorio</h2>
+              <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center">
+                <X size={18} className="text-[#111]" />
+              </button>
+            </div>
+            {saveError && <div className="mb-3 px-3 py-2 bg-red-50 border border-red-200 rounded-lg text-[13px] text-red-600">{saveError}</div>}
+            <div className="space-y-4 mb-5">
+              <div>
+                <label className="block text-[13px] font-medium text-[#111] mb-1.5">Actividad</label>
+                <input type="text" value={form.actividad} onChange={e => setForm({...form, actividad: e.target.value})}
+                  className="w-full h-[48px] px-4 bg-white border border-[#d8d8de] rounded-xl text-[15px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
+                  placeholder="ej. caminar" />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#111] mb-1.5">Hora</label>
+                <input type="time" value={form.hora} onChange={e => setForm({...form, hora: e.target.value})}
+                  className="w-full h-[48px] px-4 bg-white border border-[#d8d8de] rounded-xl text-[15px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all" />
+              </div>
+              <div>
+                <label className="block text-[13px] font-medium text-[#111] mb-1.5">Número de recordatorio del día</label>
+                <input type="number" min={1} value={form.recordatorio_dia} onChange={e => setForm({...form, recordatorio_dia: parseInt(e.target.value)})}
+                  className="w-full h-[48px] px-4 bg-white border border-[#d8d8de] rounded-xl text-[15px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setShowModal(false)} className="flex-1 h-[48px] bg-[#ebebf0] hover:bg-[#d8d8de] text-[#111] rounded-xl font-medium transition-colors">Cancelar</button>
+              <button onClick={handleSave} disabled={saving} className="flex-1 h-[48px] bg-[#c97b6b] hover:bg-[#b86a5a] disabled:opacity-60 text-white rounded-xl font-semibold transition-colors">
+                {saving ? 'Guardando...' : 'Guardar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -774,100 +823,184 @@ function MedicationCard({ name, dose, instructions, time }: any) {
   );
 }
 
-function ActividadScreen() {
+function ActividadScreen({ user }: any) {
+  const elderId = user?.pin_vinculacion || 'CASA10';
+  const elderName = user?.nombre_persona_a_cuidar || 'Manuel';
   const [patterns, setPatterns] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchPatterns('CASA10')
-      .then(res => {
-        setPatterns(res);
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error(err);
-        setLoading(false);
-      });
+    fetchPatterns(elderId)
+      .then(res => { setPatterns(res); setLoading(false); })
+      .catch(() => setLoading(false));
   }, []);
+
+  // Build weekly summary data for Recharts
+  const weeklyData = (() => {
+    const dias = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
+    const arr = patterns?.semanal;
+    if (!Array.isArray(arr) || arr.length === 0) {
+      // fallback demo data
+      return dias.map((d, i) => ({ dia: d, valor: [40, 65, 50, 80, 55, 70, 45][i] }));
+    }
+    return arr.map((p: any) => ({ dia: p.dia || p.label, valor: p.valor || p.total || 0 }));
+  })();
+
+
+  // Pasos por hora
+  const pasosData: {hora: string; valor: number; highlight: boolean}[] = (() => {
+    const raw = patterns?.diario?.pasos || patterns?.pasos;
+    if (!Array.isArray(raw) || raw.length === 0) return [
+      {hora:'8am',valor:120,highlight:false},{hora:'9am',valor:300,highlight:true},
+      {hora:'10-12',valor:0,highlight:false},{hora:'1pm',valor:450,highlight:true},
+      {hora:'3pm',valor:200,highlight:false},{hora:'5pm',valor:380,highlight:true},
+      {hora:'8pm',valor:80,highlight:false},
+    ];
+    const max = Math.max(...raw.map((p:any) => p.valor || 0));
+    return raw.map((p:any) => ({ hora: p.hora || p.label, valor: p.valor || 0, highlight: (p.valor||0) === max }));
+  })();
+
+  // BPM por hora — Recharts LineChart
+  const bpmData: {hora: string; bpm: number}[] = (() => {
+    const raw = patterns?.diario?.ritmoCardiaco || patterns?.ritmoCardiaco;
+    if (!Array.isArray(raw) || raw.length === 0) return [
+      {hora:'8am',bpm:72},{hora:'9am',bpm:85},{hora:'10am',bpm:78},
+      {hora:'11am',bpm:90},{hora:'12pm',bpm:82},{hora:'2pm',bpm:76},
+      {hora:'4pm',bpm:88},{hora:'6pm',bpm:80},
+    ];
+    return raw.map((p:any) => ({ hora: p.hora || p.label, bpm: p.valor || 0 }));
+  })();
+  const latestBpm = bpmData[bpmData.length - 1]?.bpm || 0;
+
+  // Tiempo Sala por hora
+  const salaData: {hora: string; valor: number; highlight: boolean}[] = (() => {
+    const raw = patterns?.diario?.tiempoSala || patterns?.tiempoSala;
+    if (!Array.isArray(raw) || raw.length === 0) return [
+      {hora:'8am',valor:30,highlight:false},{hora:'9am',valor:10,highlight:true},
+      {hora:'10-12',valor:120,highlight:false},{hora:'1pm',valor:5,highlight:true},
+      {hora:'3pm',valor:60,highlight:false},{hora:'5pm',valor:15,highlight:true},
+      {hora:'8pm',valor:90,highlight:false},
+    ];
+    const min = Math.min(...raw.map((p:any) => p.valor || 0));
+    return raw.map((p:any) => ({ hora: p.hora || p.label, valor: p.valor || 0, highlight: (p.valor||0) === min }));
+  })();
+  const totalSala = salaData.reduce((s, p) => s + p.valor, 0);
 
   return (
     <div className="px-4 pt-4 pb-6">
-      {/* Date Selector */}
-      <div className="flex gap-2 mb-6 overflow-x-auto">
-        {[
-          { day: '17', name: 'Lu' },
-          { day: '18', name: 'Ma' },
-          { day: '19', name: 'Mi' },
-          { day: '20', name: 'Ju' },
-          { day: '21', name: 'Vi' },
-          { day: '22', name: 'Sa' }
-        ].map((date, i) => (
-          <button
-            key={i}
-            className={`flex-shrink-0 w-[50px] h-[78px] rounded-[10px] border flex flex-col items-center justify-center gap-1 shadow-sm ${
-              i === 0 ? 'bg-[#d8d8de] border-[#d8d8de]' : 'bg-white border-[#d8d8de]'
-            }`}
-          >
-            <span className="text-[12px] font-normal">{date.day}</span>
-            <span className="text-[12px] font-normal">{date.name}</span>
-          </button>
-        ))}
-      </div>
+      <h1 className="text-[24px] font-semibold text-[#111] mb-1">Actividad de {elderName}</h1>
+      <p className="text-[14px] text-[#8e8e93] mb-5">Hoy</p>
 
-      {/* Resumen Card - Filled Area Chart */}
-      <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-5 mb-6">
-        <h3 className="text-[20px] font-semibold text-[#c97b6b] mb-4">Resumen Semanal</h3>
-        <div className="h-[80px] w-full relative">
-          <svg className="w-full h-full" viewBox="0 0 353 80" preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="areaGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%" stopColor="#c97b6b" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#c97b6b" stopOpacity="0.05" />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0 50 L50 30 L100 45 L150 20 L200 35 L250 25 L300 40 L353 15 L353 80 L0 80 Z"
-              fill="url(#areaGradient)"
-            />
-            <path
-              d="M0 50 L50 30 L100 45 L150 20 L200 35 L250 25 L300 40 L353 15"
-              stroke="#C97B6B"
-              strokeWidth="2.5"
-              fill="none"
-            />
-            {[0, 50, 100, 150, 200, 250, 300, 353].map((x, i) => {
-              const y = [50, 30, 45, 20, 35, 25, 40, 15][i];
-              return (
-                <circle
-                  key={i}
-                  cx={x}
-                  cy={y}
-                  r="4"
-                  fill="#C97B6B"
-                  stroke="white"
-                  strokeWidth="2"
-                />
-              );
-            })}
-          </svg>
+      {loading ? (
+        <p className="text-center text-[#8e8e93] py-12">Cargando datos...</p>
+      ) : (
+        <div className="space-y-4">
+
+          {/* Resumen Semanal — Recharts AreaChart */}
+          <div className="bg-white rounded-[16px] border border-[#d8d8de] shadow-sm p-4">
+            <p className="text-[16px] font-semibold text-[#c97b6b] mb-3">Resumen Semanal</p>
+            <ResponsiveContainer width="100%" height={100}>
+              <AreaChart data={weeklyData} margin={{top:6,right:6,left:-30,bottom:0}}>
+                <defs>
+                  <linearGradient id="wGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#c97b6b" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#c97b6b" stopOpacity={0.02}/>
+                  </linearGradient>
+                </defs>
+                <XAxis dataKey="dia" tick={{fontSize:11,fill:'#8e8e93'}} axisLine={false} tickLine={false}/>
+                <YAxis hide/>
+                <Tooltip contentStyle={{fontSize:12,borderRadius:8,border:'1px solid #d8d8de'}} formatter={(v:any)=>[v,'pasos']}/>
+                <Area type="monotone" dataKey="valor" stroke="#c97b6b" strokeWidth={2.5} fill="url(#wGrad)"
+                  dot={{r:3,fill:'#c97b6b',stroke:'white',strokeWidth:2}}
+                  activeDot={{r:5,fill:'#c97b6b',stroke:'white',strokeWidth:2}}/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Grid: Pasos + Frecuencia Cardiaca */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Pasos */}
+            <div className="bg-white rounded-[16px] border border-[#d8d8de] shadow-sm p-4">
+              <p className="text-[14px] font-semibold text-[#c97b6b] mb-1">Pasos</p>
+              <p className="text-[22px] font-bold text-[#111] mb-3">{pasosData.reduce((s,p)=>s+p.valor,0).toLocaleString()}</p>
+              <div className="flex items-end justify-between gap-1 h-[44px]">
+                {pasosData.map((p, i) => {
+                  const pct = Math.max(20, (p.valor / Math.max(...pasosData.map(x=>x.valor), 1)) * 100);
+                  return (
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group">
+                      <div
+                        className={`w-full rounded-full transition-colors duration-200 ${p.highlight ? 'bg-[#8faf74] group-hover:bg-[#7a9a63]' : 'bg-[#d9d9d9] group-hover:bg-[#c9c9c9]'}`}
+                        style={{height:`${pct}%`}}
+                      />
+                      {/* Custom Tooltip */}
+                      <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white border border-[#d8d8de] rounded-[8px] p-1.5 px-2 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20 shadow-md whitespace-nowrap">
+                        <p className="text-[11px] font-medium text-[#c97b6b]">{p.valor} pasos</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex justify-between mt-1">
+                {pasosData.map((p,i) => (
+                  <span key={i} className="text-[9px] text-[#8e8e93] flex-1 text-center leading-tight">{p.hora}</span>
+                ))}
+              </div>
+            </div>
+
+            {/* Frecuencia Cardiaca — Recharts LineChart */}
+            <div className="bg-white rounded-[16px] border border-[#d8d8de] shadow-sm p-4">
+              <p className="text-[14px] font-semibold text-[#c97b6b] mb-1">Frec. Cardíaca</p>
+              <p className="text-[22px] font-bold text-[#111] mb-2">{latestBpm} <span className="text-[14px] font-medium text-[#8e8e93]">bpm</span></p>
+              <ResponsiveContainer width="100%" height={56}>
+                <LineChart data={bpmData} margin={{top:4,right:4,left:-40,bottom:0}}>
+                  <XAxis dataKey="hora" hide/>
+                  <YAxis hide domain={['auto','auto']}/>
+                  <Tooltip contentStyle={{fontSize:11,borderRadius:8,border:'1px solid #d8d8de'}} formatter={(v:any)=>[`${v} bpm`,'']}/>
+                  <Line type="monotone" dataKey="bpm" stroke="#c97b6b" strokeWidth={2}
+                    dot={false} activeDot={{r:4,fill:'#c97b6b'}}/>
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="flex justify-between mt-1">
+                {bpmData.map((p,i) => (
+                  <span key={i} className="text-[9px] text-[#8e8e93] flex-1 text-center leading-tight">{p.hora}</span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Tiempo Sala */}
+          <div className="bg-white rounded-[16px] border border-[#d8d8de] shadow-sm p-4">
+            <div className="flex items-center justify-between mb-1">
+              <p className="text-[14px] font-semibold text-[#c97b6b]">Tiempo en Sala</p>
+              <p className="text-[14px] font-bold text-[#111]">{totalSala} min</p>
+            </div>
+            <div className="flex items-end justify-between gap-1.5 h-[44px] mb-1">
+              {salaData.map((p, i) => {
+                const maxV = Math.max(...salaData.map(x=>x.valor), 1);
+                const pct = Math.max(20, (p.valor / maxV) * 100);
+                return (
+                  <div key={i} className="flex-1 flex flex-col items-center justify-end h-full relative group">
+                    <div
+                      className={`w-full rounded-full transition-colors duration-200 ${p.highlight ? 'bg-[#8faf74] group-hover:bg-[#7a9a63]' : 'bg-[#d9d9d9] group-hover:bg-[#c9c9c9]'}`}
+                      style={{height:`${pct}%`}}
+                    />
+                    {/* Custom Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white border border-[#d8d8de] rounded-[8px] p-1.5 px-2 text-center opacity-0 group-hover:opacity-100 pointer-events-none transition-opacity z-20 shadow-md whitespace-nowrap">
+                      <p className="text-[11px] font-medium text-[#c97b6b]">{p.valor} min</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between">
+              {salaData.map((p,i) => (
+                <span key={i} className="text-[9px] text-[#8e8e93] flex-1 text-center leading-tight">{p.hora}</span>
+              ))}
+            </div>
+          </div>
+
         </div>
-      </div>
-
-      {/* Activity Cards Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-6">
-        {loading ? (
-          <div className="col-span-2 text-center text-[#8e8e93]">Cargando patrones...</div>
-        ) : !patterns ? (
-          <div className="col-span-2 text-center text-red-500">Error cargando patrones</div>
-        ) : (
-          <>
-            <ActivityMetricCard title="Pasos" value={patterns.pasos?.[0]?.valor || 0} type="bars" />
-            <ActivityMetricCard title="Movimiento" value={patterns.movimiento?.[0]?.valor || 0} type="wave" />
-            <ActivityMetricCard title="Frecuencia Cardiaca" value={patterns.ritmoCardiaco?.[0]?.valor || 0} unit="bpm" type="pulse" />
-            <ActivityMetricCard title="Tiempo Sala" value={patterns.tiempoSala?.[0]?.valor || 0} unit="min" type="bars" />
-          </>
-        )}
-      </div>
+      )}
     </div>
   );
 }
@@ -953,31 +1086,21 @@ function ActivityCard({ icon, title, progress }: any) {
 function AlertasScreen() {
   return (
     <div className="px-4 pt-4 pb-6">
-      <h1 className="text-[28px] font-semibold text-[#c97b6b] mb-6">Hoy</h1>
+      <h1 className="text-[28px] font-semibold text-[#111] mb-6">Alertas</h1>
 
-      <AlertSection title="Ayer" alerts={[
+      <AlertSection title="Hoy" alerts={[
         {
           title: 'Rutina estable',
-          message: 'Sin cambios relevantes',
-          time: 'Ayer, 18:30'
-        },
-        {
-          title: 'Movimiento detectado',
-          message: 'Actividad dentro de lo normal',
-          time: 'Ayer, 15:10'
+          message: 'Sin cambios relevantes detectados en el sistema.',
+          time: 'Hoy, 10:30 a. m.'
         }
       ]} />
 
-      <AlertSection title="Ultimos 7 dias" alerts={[
+      <AlertSection title="Ayer" alerts={[
         {
           title: 'Medicación completada',
-          message: 'Cumplimiento sin incidencias',
-          time: 'Lunes'
-        },
-        {
-          title: 'Variación leve en rutina',
-          message: 'Cambio en horario habitual',
-          time: 'Domingo'
+          message: 'Cumplimiento de dosis sin incidencias.',
+          time: 'Ayer, 8:00 a. m.'
         }
       ]} />
     </div>
@@ -999,17 +1122,15 @@ function AlertSection({ title, alerts }: any) {
   );
 }
 
-function AjustesScreen() {
+function AjustesScreen({ user }: any) {
   const [openPanel, setOpenPanel] = useState<string | null>(null);
-  const [userSettings, setUserSettings] = useState<any>(null);
+  const [profileData, setProfileData] = useState<any>(null);
+  const [profileLoading, setProfileLoading] = useState(false);
 
-  useEffect(() => {
-    fetchSettings('CASA10')
-      .then(res => {
-        setUserSettings(res);
-      })
-      .catch(err => console.error('Error fetching settings', err));
-  }, []);
+  // Items no clickeables
+  const DISABLED = ['Información', 'Privacidad', 'Contacto', 'Soporte'];
+  // Items con panel genérico
+  const GENERIC = ['Alertas', 'Notificaciones', 'Rutina y seguimiento'];
 
   const settingsMenu = [
     'Perfil y Cuenta',
@@ -1023,55 +1144,152 @@ function AjustesScreen() {
     'Soporte'
   ];
 
+  const handleClick = (setting: string) => {
+    if (DISABLED.includes(setting)) return;
+    if (setting === 'Perfil y Cuenta') {
+      setOpenPanel('Perfil y Cuenta');
+      if (!profileData && user?.email) {
+        setProfileLoading(true);
+        fetchUserByEmail(user.email)
+          .then(res => setProfileData(res))
+          .catch(() => setProfileData(null))
+          .finally(() => setProfileLoading(false));
+      }
+      return;
+    }
+    if (GENERIC.includes(setting)) {
+      setOpenPanel(setting);
+      return;
+    }
+    // Sistema: se despliega inline (ver abajo)
+  };
+
   return (
     <div className="px-4 pt-4 pb-6 bg-white">
       <h1 className="text-[28px] font-semibold text-[#111] mb-8">Ajustes</h1>
 
       <div className="bg-white">
-        {settingsMenu.map((setting, i) => (
-          <button
-            key={i}
-            onClick={() => setOpenPanel(setting)}
-            className="w-full flex items-center justify-between py-4 border-b border-[#d8d8de] hover:bg-[#fdfcfb] transition-colors"
-          >
-            <span className="text-[18px] text-[#c97b6b] font-normal">{setting}</span>
-            <ChevronRight size={20} className="text-[#c97b6b]" />
-          </button>
-        ))}
+        {settingsMenu.map((setting, i) => {
+          const disabled = DISABLED.includes(setting);
+          const isSistema = setting === 'Sistema';
+
+          return (
+            <div key={i}>
+              {/* Row */}
+              <div
+                className={`w-full flex items-center justify-between py-4 border-b border-[#d8d8de] ${
+                  disabled ? 'opacity-40 cursor-default' : 'hover:bg-[#fdfcfb] cursor-pointer'
+                } transition-colors`}
+                onClick={() => handleClick(setting)}
+              >
+                <span className="text-[18px] text-[#c97b6b] font-normal">{setting}</span>
+                {!disabled && <ChevronRight size={20} className="text-[#c97b6b]" />}
+              </div>
+
+              {/* Sistema: contenido inline expandido */}
+              {isSistema && (
+                <div className="py-4 border-b border-[#d8d8de] bg-white space-y-3">
+                  <div className="flex items-center gap-3 p-4 bg-[#f0f7eb] rounded-xl border border-[#8faf74]/30">
+                    <div className="w-3 h-3 rounded-full bg-[#8faf74] flex-shrink-0"></div>
+                    <div>
+                      <p className="text-[15px] font-semibold text-[#111]">Tótem conectado</p>
+                      <p className="text-[13px] text-[#6e6e73]">Pin: {user?.pin_vinculacion || 'CASA10'} — Activo y transmitiendo</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-[#d8d8de]">
+                    <div className="w-8 h-8 rounded-xl bg-[#ebebf0] flex items-center justify-center flex-shrink-0">
+                      <Settings size={16} className="text-[#6e6e73]" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-[#111]">Firmware</p>
+                      <p className="text-[13px] text-[#8e8e93]">Versión estable — Sin actualizaciones pendientes</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 p-4 bg-white rounded-xl border border-[#d8d8de]">
+                    <div className="w-8 h-8 rounded-xl bg-[#ebebf0] flex items-center justify-center flex-shrink-0">
+                      <Wifi size={16} className="text-[#6e6e73]" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-[#111]">Conectividad</p>
+                      <p className="text-[13px] text-[#8e8e93]">Bluetooth activo — Señal estable</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
       </div>
 
-      {/* Settings Panel */}
-      {openPanel && (
+      {/* Panel lateral: Perfil y Cuenta */}
+      {openPanel === 'Perfil y Cuenta' && (
         <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setOpenPanel(null)}>
-          <div
-            className="absolute right-0 top-0 bottom-0 w-[85%] bg-white shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="absolute right-0 top-0 bottom-0 w-[85%] desktop:w-[420px] bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
             <div className="h-full flex flex-col">
-              {/* Header */}
               <div className="flex items-center justify-between p-4 border-b border-[#d8d8de]">
-                <h2 className="text-[20px] font-semibold text-[#111]">{openPanel}</h2>
-                <button
-                  onClick={() => setOpenPanel(null)}
-                  className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center hover:bg-[#d8d8de] transition-colors"
-                >
+                <h2 className="text-[20px] font-semibold text-[#111]">Perfil y Cuenta</h2>
+                <button onClick={() => setOpenPanel(null)}
+                  className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center hover:bg-[#d8d8de] transition-colors">
                   <X size={18} className="text-[#111]" />
                 </button>
               </div>
-
-              {/* Content */}
               <div className="flex-1 overflow-y-auto p-4">
-                <p className="text-[16px] text-[#6e6e73] mb-4">
-                  Configuración de {openPanel.toLowerCase()}
-                </p>
-                <div className="space-y-3">
-                  <div className="bg-[#fdfcfb] rounded-lg p-4 border border-[#d8d8de]">
-                    <p className="text-[14px] text-[#8e8e93]">
-                      {(openPanel === 'Notificaciones' && userSettings?.notificaciones) ? 'Las notificaciones están activadas.' : 
-                       (openPanel === 'Alertas' && userSettings?.alertas) ? 'Las alertas están activadas.' : 
-                       'Las opciones de configuración para esta sección aparecerán aquí.'}
-                    </p>
+                {profileLoading ? (
+                  <p className="text-[#8e8e93] text-center py-8">Cargando perfil...</p>
+                ) : profileData ? (
+                  <div className="space-y-4">
+                    {/* Avatar */}
+                    <div className="flex flex-col items-center py-6">
+                      <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#c97b6b] to-[#b86a5a] flex items-center justify-center mb-3 shadow-lg">
+                        <span className="text-white text-[32px] font-bold">
+                          {(profileData.nombre || 'U')[0].toUpperCase()}
+                        </span>
+                      </div>
+                      <p className="text-[20px] font-semibold text-[#111]">{profileData.nombre}</p>
+                      <p className="text-[14px] text-[#8e8e93]">{profileData.rol}</p>
+                    </div>
+
+                    {/* Datos */}
+                    {[
+                      { label: 'Correo electrónico', value: profileData.email },
+                      { label: 'Pin de vinculación', value: profileData.pin_vinculacion },
+                      { label: 'Persona a cuidar', value: profileData.nombre_persona_a_cuidar },
+                      { label: 'Rol', value: profileData.rol },
+                    ].map(({ label, value }) => (
+                      <div key={label} className="bg-[#fdfcfb] rounded-xl border border-[#d8d8de] px-4 py-3">
+                        <p className="text-[12px] text-[#8e8e93] mb-0.5">{label}</p>
+                        <p className="text-[15px] font-medium text-[#111]">{value || '—'}</p>
+                      </div>
+                    ))}
                   </div>
+                ) : (
+                  <p className="text-[14px] text-[#8e8e93] text-center py-8">No se pudo cargar el perfil.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Panel lateral: genérico (Alertas, Notificaciones, Rutina) */}
+      {openPanel && !['Perfil y Cuenta'].includes(openPanel) && (
+        <div className="fixed inset-0 bg-black/40 z-50" onClick={() => setOpenPanel(null)}>
+          <div className="absolute right-0 top-0 bottom-0 w-[85%] desktop:w-[420px] bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}>
+            <div className="h-full flex flex-col">
+              <div className="flex items-center justify-between p-4 border-b border-[#d8d8de]">
+                <h2 className="text-[20px] font-semibold text-[#111]">{openPanel}</h2>
+                <button onClick={() => setOpenPanel(null)}
+                  className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center hover:bg-[#d8d8de] transition-colors">
+                  <X size={18} className="text-[#111]" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="bg-[#fdfcfb] rounded-xl border border-[#d8d8de] p-4">
+                  <p className="text-[14px] text-[#8e8e93]">
+                    Las opciones de configuración para {openPanel.toLowerCase()} aparecerán aquí.
+                  </p>
                 </div>
               </div>
             </div>
@@ -1081,3 +1299,4 @@ function AjustesScreen() {
     </div>
   );
 }
+
