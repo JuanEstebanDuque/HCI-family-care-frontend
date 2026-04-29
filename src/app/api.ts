@@ -77,15 +77,55 @@ export async function fetchMedications(elderId: string) {
   return response.json();
 }
 
-export async function addMedication(medicationData: { elder_id: string, name: string, dose: string, schedule: string }) {
+export async function addMedication(medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string }) {
   const response = await fetch(`${API_BASE_URL}/medications`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(medicationData)
   });
   if (!response.ok) throw new Error('Failed to add medication');
+  return response.json();
+}
+
+export async function updateMedication(id: string, medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string }) {
+  const response = await fetch(`${API_BASE_URL}/medications/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(medicationData)
+  });
+  if (!response.ok) throw new Error('Failed to update medication');
+  return response.json();
+}
+
+export async function deleteMedication(id: string) {
+  const response = await fetch(`${API_BASE_URL}/medications/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) throw new Error('Failed to delete medication');
+  return response.json();
+}
+
+export async function updateReminder(id: string, data: { elder_id: string; actividad: string; recordatorio_dia: number; hora: string }) {
+  const response = await fetch(`${API_BASE_URL}/reminders/${id}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || 'Error al actualizar recordatorio');
+  }
+  return response.json();
+}
+
+export async function deleteReminder(id: string) {
+  const response = await fetch(`${API_BASE_URL}/reminders/${id}`, {
+    method: 'DELETE'
+  });
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.message || 'Error al eliminar recordatorio');
+  }
   return response.json();
 }
 

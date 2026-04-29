@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Home, Heart, Bell, Settings, Eye, EyeOff, Wifi, Check, ChevronRight, X, Plus } from 'lucide-react';
+import { Home, Heart, Bell, Settings, Eye, EyeOff, Wifi, Check, ChevronRight, X, Plus, Edit, Trash2 } from 'lucide-react';
 import { AreaChart, Area, LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchDashboard, fetchTimeline, fetchPatterns, fetchMedications, addMedication, fetchSettings, registerUser, loginUser, fetchUserByEmail, fetchReminders, addReminder } from './api';
+import { fetchDashboard, fetchTimeline, fetchPatterns, fetchMedications, addMedication, updateMedication, deleteMedication, fetchSettings, registerUser, loginUser, fetchUserByEmail, fetchReminders, addReminder, updateReminder, deleteReminder } from './api';
 
 export default function App() {
   const [authStep, setAuthStep] = useState<'login' | 'hardware' | 'dashboard'>('login');
@@ -494,6 +494,7 @@ function TimelineScreen({ user }: any) {
   const [form, setForm] = useState({ actividad: '', recordatorio_dia: 1, hora: '' });
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const today = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
 
@@ -510,14 +511,35 @@ function TimelineScreen({ user }: any) {
     if (!form.actividad || !form.hora) return;
     setSaving(true); setSaveError('');
     try {
-      await addReminder({ elder_id: elderId, ...form });
+      if (editingId) {
+        await updateReminder(editingId, { elder_id: elderId, ...form });
+      } else {
+        await addReminder({ elder_id: elderId, ...form });
+      }
       setForm({ actividad: '', recordatorio_dia: 1, hora: '' });
+      setEditingId(null);
       setShowModal(false);
       load();
     } catch (e: any) {
       setSaveError(e.message);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleEdit = (r: any) => {
+    setForm({ actividad: r.actividad, recordatorio_dia: r.recordatorio_dia, hora: r.hora });
+    setEditingId(r._id);
+    setShowModal(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Eliminar recordatorio?')) return;
+    try {
+      await deleteReminder(id);
+      load();
+    } catch (e) {
+      alert('Error eliminando');
     }
   };
 
@@ -529,7 +551,11 @@ function TimelineScreen({ user }: any) {
       <div className="flex items-center justify-between mb-1">
         <h1 className="text-[28px] font-semibold text-[#111]">Plan de {elderName}</h1>
         <button
-          onClick={() => setShowModal(true)}
+          onClick={() => {
+            setEditingId(null);
+            setForm({ actividad: '', recordatorio_dia: 1, hora: '' });
+            setShowModal(true);
+          }}
           className="w-10 h-10 rounded-full bg-[#c97b6b] flex items-center justify-center shadow-lg hover:bg-[#b86a5a] transition-colors">
           <Plus size={20} className="text-white" />
         </button>
@@ -562,7 +588,13 @@ function TimelineScreen({ user }: any) {
                     <p className="text-[16px] font-semibold text-[#111] capitalize">{r.actividad}</p>
                     <span className="text-[13px] text-[#c97b6b] font-medium">{r.hora}</span>
                   </div>
-                  <p className="text-[13px] text-[#8e8e93]">Recordatorio #{r.recordatorio_dia}</p>
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-[13px] text-[#8e8e93]">Recordatorio #{r.recordatorio_dia}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => handleEdit(r)}><Edit size={14} className="text-[#8e8e93] hover:text-[#c97b6b]"/></button>
+                      <button onClick={() => handleDelete(r._id)}><Trash2 size={14} className="text-red-400 hover:text-red-600"/></button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
@@ -575,7 +607,7 @@ function TimelineScreen({ user }: any) {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowModal(false)}>
           <div className="bg-white rounded-[24px] w-full max-w-[360px] p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-[22px] font-bold text-[#111]">Nuevo Recordatorio</h2>
+              <h2 className="text-[22px] font-bold text-[#111]">{editingId ? 'Editar Recordatorio' : 'Nuevo Recordatorio'}</h2>
               <button onClick={() => setShowModal(false)} className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center">
                 <X size={18} className="text-[#111]" />
               </button>
@@ -633,10 +665,12 @@ function MedicacionScreen() {
   const [medications, setMedications] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     nombre: '',
     dosis: '',
-    horario: ''
+    horario: '',
+    hora: ''
   });
 
   const loadMedications = () => {
@@ -657,19 +691,35 @@ function MedicacionScreen() {
   }, []);
 
   const handleSave = () => {
-    addMedication({
+    const payload = {
       elder_id: 'CASA10',
       name: formData.nombre,
       dose: formData.dosis,
-      schedule: formData.horario
-    }).then(() => {
-      setFormData({ nombre: '', dosis: '', horario: '' });
+      schedule: formData.horario,
+      hora: formData.hora
+    };
+    const action = editingId ? updateMedication(editingId, payload) : addMedication(payload);
+    
+    action.then(() => {
+      setFormData({ nombre: '', dosis: '', horario: '', hora: '' });
+      setEditingId(null);
       setShowModal(false);
       loadMedications();
     }).catch(err => {
       console.error(err);
       alert('Error al guardar medicamento');
     });
+  };
+
+  const handleEdit = (med: any) => {
+    setFormData({ nombre: med.name, dosis: med.dose, horario: med.schedule, hora: med.hora || '' });
+    setEditingId(med._id);
+    setShowModal(true);
+  };
+
+  const handleDelete = (id: string) => {
+    if (!confirm('¿Eliminar medicamento?')) return;
+    deleteMedication(id).then(() => loadMedications()).catch(() => alert('Error eliminando'));
   };
 
   return (
@@ -706,10 +756,9 @@ function MedicacionScreen() {
           medications.map((med, index) => (
             <MedicationCard
               key={med._id || index}
-              name={med.name}
-              dose={med.dose}
-              instructions=""
-              time={med.schedule}
+              med={med}
+              onEdit={() => handleEdit(med)}
+              onDelete={() => handleDelete(med._id)}
             />
           ))
         )}
@@ -717,7 +766,11 @@ function MedicacionScreen() {
 
       {/* Add New Button */}
       <button
-        onClick={() => setShowModal(true)}
+        onClick={() => {
+          setEditingId(null);
+          setFormData({ nombre: '', dosis: '', horario: '', hora: '' });
+          setShowModal(true);
+        }}
         className="w-[185px] h-[56px] bg-[#8faf74] hover:bg-[#7a9a63] rounded-[20px] text-white text-[16px] font-medium mx-auto block mt-8 transition-colors shadow-lg shadow-[#8faf74]/20"
       >
         ADD NEW
@@ -732,7 +785,7 @@ function MedicacionScreen() {
           >
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-[24px] font-bold text-[#111]">Nuevo Medicamento</h2>
+              <h2 className="text-[24px] font-bold text-[#111]">{editingId ? 'Editar Medicamento' : 'Nuevo Medicamento'}</h2>
               <button
                 onClick={() => setShowModal(false)}
                 className="w-8 h-8 rounded-full bg-[#ebebf0] flex items-center justify-center hover:bg-[#d8d8de] transition-colors"
@@ -771,14 +824,26 @@ function MedicacionScreen() {
 
               <div>
                 <label className="block text-[14px] font-medium text-[#111] mb-2">
-                  Horario
+                  Instrucciones
                 </label>
                 <input
                   type="text"
                   value={formData.horario}
                   onChange={(e) => setFormData({ ...formData, horario: e.target.value })}
                   className="w-full h-[48px] px-4 bg-white border border-[#d8d8de] rounded-xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
-                  placeholder="Ej: 08:00"
+                  placeholder="Ej: Con el desayuno"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[14px] font-medium text-[#111] mb-2">
+                  Hora
+                </label>
+                <input
+                  type="time"
+                  value={formData.hora}
+                  onChange={(e) => setFormData({ ...formData, hora: e.target.value })}
+                  className="w-full h-[48px] px-4 bg-white border border-[#d8d8de] rounded-xl text-[16px] focus:outline-none focus:border-[#c97b6b] focus:ring-2 focus:ring-[#c97b6b]/20 transition-all"
                 />
               </div>
             </div>
@@ -805,19 +870,23 @@ function MedicacionScreen() {
   );
 }
 
-function MedicationCard({ name, dose, instructions, time }: any) {
+function MedicationCard({ med, onEdit, onDelete }: any) {
   return (
     <div className="bg-white rounded-[10px] border border-[#d8d8de] shadow-lg p-4">
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1">
-          <p className="text-[16px] font-medium text-[#c97b6b] mb-1">{name}</p>
-          <p className="text-[14px] text-[#8e8e93]">{dose}</p>
+          <p className="text-[16px] font-medium text-[#c97b6b] mb-1">{med.name}</p>
+          <p className="text-[14px] text-[#8e8e93]">{med.dose}</p>
         </div>
-        <div className="w-2.5 h-2.5 rounded-full bg-[#c97b6b] mt-1.5"></div>
+        <div className="flex items-center gap-2">
+          <button onClick={onEdit}><Edit size={16} className="text-[#8e8e93] hover:text-[#c97b6b]"/></button>
+          <button onClick={onDelete}><Trash2 size={16} className="text-red-400 hover:text-red-600"/></button>
+          <div className="w-2.5 h-2.5 rounded-full bg-[#c97b6b] mt-0.5 ml-2"></div>
+        </div>
       </div>
-      <div className="flex items-center justify-between text-[14px] text-[#c97b6b]">
-        <span>{instructions}</span>
-        <span>{time}</span>
+      <div className="flex items-center justify-between text-[14px] text-[#c97b6b] mt-2">
+        <span>{med.schedule}</span>
+        <span>{med.hora}</span>
       </div>
     </div>
   );
