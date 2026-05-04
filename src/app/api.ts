@@ -7,7 +7,13 @@ export async function fetchReminders(elderId: string) {
   return response.json();
 }
 
-export async function addReminder(data: { elder_id: string; actividad: string; recordatorio_dia: number; hora: string }) {
+export interface Repetition {
+  frequency: 'none' | 'daily' | 'weekly' | 'monthly' | 'yearly';
+  interval?: number;
+  daysOfWeek?: number[];
+}
+
+export async function addReminder(data: { elder_id: string; actividad: string; recordatorio_dia: number; hora: string; repetition?: Repetition }) {
   const response = await fetch(`${API_BASE_URL}/reminders`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -71,13 +77,19 @@ export async function fetchPatterns(elderId: string) {
   return response.json();
 }
 
+export async function fetchDailyRoutine(elderId: string) {
+  const response = await fetch(`${API_BASE_URL}/analytics/routine/${elderId}`);
+  if (!response.ok) throw new Error('Failed to fetch daily routine');
+  return response.json();
+}
+
 export async function fetchMedications(elderId: string) {
   const response = await fetch(`${API_BASE_URL}/medications/elder/${elderId}`);
   if (!response.ok) throw new Error('Failed to fetch medications data');
   return response.json();
 }
 
-export async function addMedication(medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string }) {
+export async function addMedication(medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string, repetition?: Repetition }) {
   const response = await fetch(`${API_BASE_URL}/medications`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -87,7 +99,7 @@ export async function addMedication(medicationData: { elder_id: string, name: st
   return response.json();
 }
 
-export async function updateMedication(id: string, medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string }) {
+export async function updateMedication(id: string, medicationData: { elder_id: string, name: string, dose: string, schedule: string, hora: string, repetition?: Repetition }) {
   const response = await fetch(`${API_BASE_URL}/medications/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
@@ -105,7 +117,7 @@ export async function deleteMedication(id: string) {
   return response.json();
 }
 
-export async function updateReminder(id: string, data: { elder_id: string; actividad: string; recordatorio_dia: number; hora: string }) {
+export async function updateReminder(id: string, data: { elder_id: string; actividad: string; recordatorio_dia: number; hora: string; repetition?: Repetition }) {
   const response = await fetch(`${API_BASE_URL}/reminders/${id}`, {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
